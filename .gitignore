@@ -1,0 +1,11 @@
+node_modules/
+dist/
+build/
+out/
+.DS_Store/
+.eslintcache
+*.log*
+.env
+.claude/
+.vscode/
+CLAUDE.md
