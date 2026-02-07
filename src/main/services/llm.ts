@@ -1,14 +1,24 @@
 import axios from "axios";
 import { ExtractedWord, Translation } from "../../shared/types";
+import { getConfig } from '../config';
 
-export async function callZhipuAPI(messages, model = 'glm-4.5-airx') {
-  const url = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
+export async function callZhipuAPI(messages) {
+  const model = getConfig('llmModel')
+  const baseUrl = getConfig('llmEndpoint')
+  const apiKey = getConfig('llmApiKey')
+
+  if (!baseUrl || !model || !apiKey) {
+    throw new Error('LLM not correctly configured. Please set it in settings.')
+  }
+
+  const urlBuilder = new URL('chat/completions', baseUrl)
+  const url = urlBuilder.toString()
 
   const response = await axios({
     method: 'POST',
     url: url,
     headers: {
-      'Authorization': 'Bearer ' + process.env.ZHIPU_API_KEY,
+      'Authorization': 'Bearer ' + apiKey,
       'Content-Type': 'application/json'
     },
     data: {

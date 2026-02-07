@@ -1,10 +1,10 @@
 import { BrowserWindow } from "electron";
 import { TranslationUpdate } from "../../shared/types";
-import { captureScreen } from "../services/capture";
-import { findNearestCharAtPosition, getTextWithPositionFromImage } from "../services/ocr";
-import { extractWord, getTranslation } from "../services/llm";
+import { getTranslation } from "../services/llm";
+import { captureSelection } from "../services/selection";
+import { popWindow } from "../utils";
 
-export async function ocrCapture(mainWindow: BrowserWindow) {
+export async function selectionCapture(mainWindow: BrowserWindow) {
   if (!mainWindow || mainWindow.isDestroyed()) return
 
   try {
@@ -14,35 +14,30 @@ export async function ocrCapture(mainWindow: BrowserWindow) {
     } as TranslationUpdate)
 
     // 3. Start async pipeline
-    const imageData = await captureScreen()
-    const ocrResult = await getTextWithPositionFromImage(imageData)
-    const charPos = findNearestCharAtPosition(ocrResult, 100, 100)
+    const word = await captureSelection()
 
-    if (charPos !== null) {
-      // 4. Extract word
-      const word = await extractWord(
-        ocrResult.words_result[charPos.wordBoxIndex].words,
-        charPos.index
-      )
+    popWindow(mainWindow)
+
+    if (word !== '') {
 
       // 5. Send word-found update
       mainWindow.webContents.send('translation-update', {
         status: 'word-found',
-        data: word
+        data: { word, language: undefined! }
       } as TranslationUpdate)
 
       // 6. Get translation
-      const translation = await getTranslation(word.language, word.word)
+      const translation = await getTranslation('auto-detect', word)
 
       // 7. Send complete update
       mainWindow.webContents.send('translation-update', {
         status: 'complete',
-        data: { ...word, translation }
+        data: { word, language: translation.language, translation }
       } as TranslationUpdate)
     } else {
       mainWindow.webContents.send('translation-update', {
         status: 'error',
-        error: 'No word detected at cursor position'
+        error: 'No text selection detected. Probably due to prohibition of copying. '
       } as TranslationUpdate)
     }
   } catch (error) {

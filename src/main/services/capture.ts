@@ -1,7 +1,8 @@
 import { desktopCapturer, screen } from 'electron';
+import { getConfig } from '../config';
 
 export async function captureScreen() {
-    const CAPTURE_SIZE = parseInt(process.env.CAPTURE_SIZE!)
+    const CAPTURE_SIZE = getConfig('captureSize')
     const HALF_SIZE = CAPTURE_SIZE / 2
 
     // Get current mouse cursor position

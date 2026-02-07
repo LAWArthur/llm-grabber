@@ -3,6 +3,8 @@ import { TranslationUpdate } from "../../shared/types";
 import { captureScreen } from "../services/capture";
 import { findNearestCharAtPosition, getTextWithPositionFromImage } from "../services/ocr";
 import { extractWord, getTranslation } from "../services/llm";
+import { popWindow } from "../utils";
+import { getConfig } from "../config";
 
 export async function ocrCapture(mainWindow: BrowserWindow) {
   if (!mainWindow || mainWindow.isDestroyed()) return
@@ -15,8 +17,12 @@ export async function ocrCapture(mainWindow: BrowserWindow) {
 
     // 3. Start async pipeline
     const imageData = await captureScreen()
+
+    popWindow(mainWindow)
+
+    const CAPTURE_SIZE = getConfig('captureSize')
     const ocrResult = await getTextWithPositionFromImage(imageData)
-    const charPos = findNearestCharAtPosition(ocrResult, 100, 100)
+    const charPos = findNearestCharAtPosition(ocrResult, CAPTURE_SIZE / 2, CAPTURE_SIZE / 2)
 
     if (charPos !== null) {
       // 4. Extract word

@@ -1,5 +1,6 @@
 import axios from 'axios'
-import { CharPosition, PositionOcrResult } from '../../shared/types';
+import { CharPosition, PositionOcrResult } from '../../shared/types'
+import { getConfig } from '../config'
 
 export async function getTextWithPositionFromImage(imageBase64: string): Promise<PositionOcrResult> {
   var options = {
@@ -25,13 +26,19 @@ export async function getTextWithPositionFromImage(imageBase64: string): Promise
 }
 
 function getAccessToken() {
+    const apiKey = getConfig('baiduApiKey')
+    const secretKey = getConfig('baiduSecretKey')
+
+    if (!apiKey || !secretKey) {
+      throw new Error('Baidu API credentials not configured. Please set API Key and Secret Key in settings.')
+    }
 
     let options = {
         'method': 'POST',
-        'url': 'https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=' 
-          + process.env.BAIDU_API_KEY 
-          + '&client_secret=' 
-          + process.env.BAIDU_SECRET_KEY,
+        'url': 'https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id='
+          + apiKey
+          + '&client_secret='
+          + secretKey,
     }
     return new Promise((resolve, reject) => {
       axios(options)

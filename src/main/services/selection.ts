@@ -1,5 +1,5 @@
+import { clipboard } from 'electron'
 import robot from 'robotjs'
-import clipboardy from 'clipboardy'
 
 interface ClipboardState {
   text: string | null
@@ -11,7 +11,7 @@ interface ClipboardState {
  */
 function saveClipboard(): ClipboardState {
   try {
-    const text = clipboardy.readSync()
+    const text = clipboard.readText()
     return {
       text: text || '',
       hasContent: text.length > 0
@@ -31,10 +31,10 @@ function saveClipboard(): ClipboardState {
 function restoreClipboard(state: ClipboardState): void {
   try {
     if (state.hasContent && state.text) {
-      clipboardy.writeSync(state.text)
+      clipboard.writeText(state.text)
     } else {
       // Clear clipboard if it was empty
-      clipboardy.writeSync('')
+      clipboard.writeText('')
     }
   } catch (error) {
     console.error('Failed to restore clipboard:', error)
@@ -80,16 +80,17 @@ function sendCopyCommand(): void {
 export async function getSelectedText(): Promise<string> {
   // Save current clipboard state
   const clipboardState = saveClipboard()
+  restoreClipboard({ hasContent: false, text: null })
 
   try {
     // Send Ctrl+C to copy selection
     sendCopyCommand()
 
     // Wait for clipboard to update (applications need time to process)
-    await new Promise((resolve) => setTimeout(resolve, 150))
+    await new Promise((resolve) => setTimeout(resolve, 300))
 
     // Read clipboard content
-    const selectedText = clipboardy.readSync().trim()
+    const selectedText = clipboard.readText().trim()
 
     // Restore original clipboard
     restoreClipboard(clipboardState)

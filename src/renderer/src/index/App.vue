@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import type { TranslationUpdate } from '../../shared/types'
+import type { TranslationUpdate } from '../../../shared/types'
 import WordDisplay from './components/WordDisplay.vue'
 import TranslationsList from './components/TranslationsList.vue'
 import ExamplesList from './components/ExamplesList.vue'

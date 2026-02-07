@@ -1,20 +1,63 @@
-require('dotenv').config()
-
-import { app, shell, BrowserWindow, globalShortcut, ipcMain, screen, Tray, Menu } from 'electron'
+import { app, shell, BrowserWindow, globalShortcut, ipcMain, Tray, Menu } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { registerMockApi } from './mockApi'
 import { ocrCapture } from './workflows/ocr'
 import icon from '../../resources/icon.png?asset'
+import { selectionCapture } from './workflows/selection'
+import { getConfig, setConfig, getAllConfig, isConfigComplete } from './config'
 
 let mainWindow: BrowserWindow | null = null
+let configWindow: BrowserWindow | null = null
 let tray: Tray | null = null
+
+// Track registered shortcuts for unregistration
+let registeredOcrShortcut: string | null = null
+let registeredSelectionShortcut: string | null = null
+
+function registerShortcuts() {
+  unregisterShortcuts()
+
+  const ocrShortcut = getConfig('ocrShortcut')
+  const selectionShortcut = getConfig('selectionShortcut')
+
+  const ocrRegistered = globalShortcut.register(ocrShortcut, async () => {
+    await ocrCapture(mainWindow!)
+  })
+
+  const selectionRegistered = globalShortcut.register(selectionShortcut, async () => {
+    await selectionCapture(mainWindow!)
+  })
+
+  if (ocrRegistered) {
+    registeredOcrShortcut = ocrShortcut
+  }
+  if (selectionRegistered) {
+    registeredSelectionShortcut = selectionShortcut
+  }
+
+  return {
+    ocrRegistered,
+    selectionRegistered
+  }
+}
+
+function unregisterShortcuts() {
+  if (registeredOcrShortcut) {
+    globalShortcut.unregister(registeredOcrShortcut)
+    registeredOcrShortcut = null
+  }
+  if (registeredSelectionShortcut) {
+    globalShortcut.unregister(registeredSelectionShortcut)
+    registeredSelectionShortcut = null
+  }
+}
 
 function createWindow(): void {
   // Create the browser window.
   const win = new BrowserWindow({
-    width: parseInt(process.env.CAPTURE_SIZE!),
-    height: parseInt(process.env.CAPTURE_SIZE!),
+    width: 200,
+    height: 200,
     show: false,
     titleBarStyle: 'hidden',
     resizable: false,
@@ -46,14 +89,42 @@ function createWindow(): void {
   mainWindow = win
 }
 
-function popWindow() {
-  if (mainWindow === null) return
-  // 1. Position and show window IMMEDIATELY
-  const cursorPoint = screen.getCursorScreenPoint()
-  const offset = 20
-  mainWindow.setPosition(cursorPoint.x - 100, cursorPoint.y - 200 - offset)
-  mainWindow.show()
-  mainWindow.focus()
+function createConfigWindow(): void {
+  if (configWindow && !configWindow.isDestroyed()) {
+    configWindow.focus()
+    return
+  }
+
+  const win = new BrowserWindow({
+    width: 600,
+    height: 500,
+    show: false,
+    titleBarStyle: 'default',
+    resizable: true,
+    autoHideMenuBar: true,
+    webPreferences: {
+      preload: join(__dirname, '../preload/config.js'),
+      sandbox: false
+    }
+  })
+
+  win.webContents.setWindowOpenHandler((details) => {
+    shell.openExternal(details.url)
+    return { action: 'deny' }
+  })
+
+  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+    // console.log(process.env['ELECTRON_RENDERER_URL'] + '/config.html')
+    win.loadURL(process.env['ELECTRON_RENDERER_URL'] + '/config.html')
+  } else {
+    win.loadFile(join(__dirname, '../renderer/config.html'))
+  }
+
+  win.once('ready-to-show', () => {
+    win.show()
+  })
+
+  configWindow = win
 }
 
 // This method will be called when Electron has finished
@@ -70,17 +141,15 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  // Register global shortcut for screen capture
-  const ret = globalShortcut.register('CommandOrControl+Alt+X', async () => {
-    popWindow()
-    await ocrCapture(mainWindow!)
-  })
-
-  if (!ret) {
-    console.error('Global shortcut registration failed')
-  }
+  // Register global shortcuts from config
+  registerShortcuts()
 
   createWindow()
+
+  // Check if configuration is complete, if not open config window
+  if (!isConfigComplete()) {
+    createConfigWindow()
+  }
 
   // Register mock API for dev/testing
   if (is.dev) {
@@ -95,8 +164,31 @@ app.whenReady().then(() => {
     }
   })
 
+  // Config management IPC handlers
+  ipcMain.handle('get-config', async (_event, key) => getConfig(key))
+  ipcMain.handle('set-config', async (_event, key, value) => {
+    setConfig(key, value)
+  })
+  ipcMain.handle('get-all-config', async () => getAllConfig())
+
+  // Shortcut management IPC handlers
+  ipcMain.handle('update-shortcuts', async () => {
+    const result = registerShortcuts()
+    return {
+      success: result.ocrRegistered && result.selectionRegistered,
+      details: result
+    }
+  })
+
+  ipcMain.handle('pause-shortcuts', async () => {
+    unregisterShortcuts()
+    return { success: true }
+  })
+
   tray = new Tray(icon)
   const contextMenu = Menu.buildFromTemplate([
+    { label: 'Settings', click: () => createConfigWindow() },
+    { type: 'separator' },
     { role: 'quit' }
   ])
   tray.setContextMenu(contextMenu)
@@ -118,3 +210,4 @@ app.on('will-quit', () => {
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and require them here.
+console.log(app.getPath('userData'))
