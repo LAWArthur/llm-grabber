@@ -1,6 +1,8 @@
 # LLM Grabber
 
-A simple Windows app that utilizes LLM to grab text from screen and translate it.
+A simple Windows app that utilizes LLM to grab text from screen and translate it into Chinese.
+
+![](./assets/image1.png)
 
 ## Install
 
